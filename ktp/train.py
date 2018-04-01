@@ -1,7 +1,7 @@
 import collections
 
 # 정차역 형식
-Stop = collections.namedtuple('Stop', ['station_idx', 'name', 'time'])
+Stop = collections.namedtuple('Stop', ['station_idx', 'name', 'time', 'line_name'])
 
 
 class Train(object):

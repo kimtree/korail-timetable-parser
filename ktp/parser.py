@@ -9,12 +9,22 @@ class KorailTimeTableParser(object):
         self.excel_filename = excel_filename
         self.trains = []
 
+    def append_train(self, train):
+        for prev_train in self.trains:
+            if prev_train.idx == train.idx:
+                return
+
+        self.trains.append(train)
+
     def parse(self):
         with xlrd.open_workbook(self.excel_filename) as workbook:
             for line_num in range(fixed_positions['IDX_EXCEL_SHEET_NUM'][0] - 1,
                                   fixed_positions['IDX_EXCEL_SHEET_NUM'][1]):
                 sheet = workbook.sheets()[line_num]
                 line_num -= 1
+
+                line_name = sheet.cell_value(0, 1)
+                print(sheet.cell_value(0, 1))
 
                 # 좌측 정차역 정보 목록
                 station_name = sheet.col_slice(1,
@@ -44,7 +54,8 @@ class KorailTimeTableParser(object):
                     train.add_stops(
                         Stop(999,
                              start_station_name.value,
-                             start_station_time.strftime('%H:%M')
+                             start_station_time.strftime('%H:%M'),
+                             line_name
                              )
                     )
 
@@ -58,7 +69,8 @@ class KorailTimeTableParser(object):
                             train.add_stops(
                                 Stop(int(station[idx].value),
                                      station_name[idx].value,
-                                     time.strftime('%H:%M')
+                                     time.strftime('%H:%M'),
+                                     line_name
                                  )
                             )
 
@@ -76,11 +88,12 @@ class KorailTimeTableParser(object):
                     train.add_stops(
                         Stop(999,
                              last_station_name.value,
-                             last_station_time.strftime('%H:%M')
+                             last_station_time.strftime('%H:%M'),
+                             line_name
                              )
                     )
 
-                    self.trains.append(train)
+                    self.append_train(train)
 
     def get_trains(self):
         return self.trains
