@@ -15,14 +15,29 @@ class Train(object):
         # 비고 사항
         self.remarks = None
 
+    def __repr__(self):
+        return '%r %r' % (self.idx, self.name)
+
     def add_stops(self, stop):
+        all_stops = self.get_stops()
+        if len(all_stops) > 0:
+            for prev_stop in all_stops:
+                if prev_stop.name == stop.name:
+                    if prev_stop.station_idx == 999:
+                        self.stops.remove(prev_stop)
+                        break
+                    return
+
         self.stops.append(stop)
 
     def set_remarks(self, remarks):
         self.remarks = remarks
 
     def get_last_stop(self):
-        return self.stops[-1]
+        if len(self.stops) > 0:
+            return self.stops[-1]
+
+        return None
 
     def get_stops(self):
         return self.stops

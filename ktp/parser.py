@@ -1,21 +1,7 @@
 import xlrd
 
 from ktp.train import Train, Stop
-
-# 열차 정보 인덱스
-IDX_COL_TRAIN = (4, 42)
-
-# 첫번쨰 정차역부터 마지막 정차역까지 컬럼의 인덱스
-IDX_COL_STATIONS = (10, 51)
-
-# 비고정보 인덱스
-IDX_COL_REMAKRS = 52
-
-# 열차정보 인덱스 (열차종별, 열차번호)
-IDX_COL_TRAIN_INFO = (8, 9)
-
-# 종착역 인덱스
-IDX_COL_LAST_STATION = (53, 56)
+from ktp.parse_position import fixed_positions, positions
 
 
 class KorailTimeTableParser(object):
@@ -25,41 +11,68 @@ class KorailTimeTableParser(object):
 
     def parse(self):
         with xlrd.open_workbook(self.excel_filename) as workbook:
-            sheet = workbook.sheets()[2]
-            print(sheet.name)
+            for line_num in range(fixed_positions['IDX_EXCEL_SHEET_NUM'][0] - 1,
+                                  fixed_positions['IDX_EXCEL_SHEET_NUM'][1]):
+                sheet = workbook.sheets()[line_num]
+                line_num -= 1
 
-            station_name = sheet.col_slice(1, IDX_COL_STATIONS[0] - 1, IDX_COL_STATIONS[1] + 1)
-            station = sheet.col_slice(2, IDX_COL_STATIONS[0] - 1, IDX_COL_STATIONS[1] + 1)
+                # 좌측 정차역 정보 목록
+                station_name = sheet.col_slice(1,
+                                               positions['IDX_COL_STOPS'][line_num][0] - 1,
+                                               positions['IDX_COL_STOPS'][line_num][1] + 1)
+                station = sheet.col_slice(2,
+                                          positions['IDX_COL_STOPS'][line_num][0] - 1,
+                                          positions['IDX_COL_STOPS'][line_num][1] + 1)
 
-            # 열차별 loop
-            for col in range(IDX_COL_TRAIN[0] - 1, IDX_COL_TRAIN[1] + 1):
-                # 기본 정보
-                train_info = sheet.col_slice(col, IDX_COL_TRAIN_INFO[0] - 1,
-                                             IDX_COL_TRAIN_INFO[1] + 1)
-                train = Train(int(train_info[1].value), train_info[0].value)
+                # 열차별 loop
+                for col in range(positions['IDX_COL_TRAIN'][line_num][0] - 1,
+                                 positions['IDX_COL_TRAIN'][line_num][1] + 1):
+                    # 기본 정보
+                    train_info = sheet.col_slice(col,
+                                                 fixed_positions['IDX_COL_TRAIN_INFO'][0] - 1,
+                                                 fixed_positions['IDX_COL_TRAIN_INFO'][1] + 1)
+                    train = Train(int(train_info[1].value), train_info[0].value)
 
-                # 정차역 정보
-                stops = sheet.col_slice(col, IDX_COL_STATIONS[0] - 1, IDX_COL_STATIONS[1] + 1)
-                for idx, stop in enumerate(stops):
-                    if stop.value and stop.ctype == xlrd.XL_CELL_DATE:
-                        time = xlrd.xldate_as_datetime(stop.value, workbook.datemode)
-                        train.add_stops(
-                            Stop(int(station[idx].value),
-                                 station_name[idx].value,
-                                 time.strftime('%H:%M')
+                    # 시발역 정보
+                    start_station = sheet.col_slice(col,
+                                                    fixed_positions['IDX_COL_START_STATION'][0] - 1,
+                                                    fixed_positions['IDX_COL_START_STATION'][1] + 1)
+                    start_station_name = start_station[0]
+                    start_station_time = xlrd.xldate_as_datetime(start_station[3].value,
+                                                                 workbook.datemode)
+
+                    train.add_stops(
+                        Stop(999,
+                             start_station_name.value,
+                             start_station_time.strftime('%H:%M')
                              )
-                        )
+                    )
 
-                # 비고 정보
-                remarks = sheet.col_slice(col, IDX_COL_REMAKRS - 1, IDX_COL_REMAKRS + 1)
-                train.set_remarks(remarks[0].value)
+                    # 정차역 정보
+                    stops = sheet.col_slice(col,
+                                            positions['IDX_COL_STOPS'][line_num][0] - 1,
+                                            positions['IDX_COL_STOPS'][line_num][1] + 1)
+                    for idx, stop in enumerate(stops):
+                        if stop.value and stop.ctype == xlrd.XL_CELL_DATE:
+                            time = xlrd.xldate_as_datetime(stop.value, workbook.datemode)
+                            train.add_stops(
+                                Stop(int(station[idx].value),
+                                     station_name[idx].value,
+                                     time.strftime('%H:%M')
+                                 )
+                            )
 
-                # 종착역 정보
-                last_station = sheet.col_slice(col, IDX_COL_LAST_STATION[0] - 1, IDX_COL_LAST_STATION[1] + 1)
-                last_station_name = last_station[0]
-                last_station_time = xlrd.xldate_as_datetime(last_station[3].value, workbook.datemode)
+                    # 비고 정보
+                    remarks = sheet.cell_value(positions['IDX_COL_STOPS'][line_num][1], col)
+                    train.set_remarks(remarks)
 
-                if train.get_last_stop().name != last_station_name.value:
+                    # 종착역 정보
+                    last_station = sheet.col_slice(col,
+                                                   positions['IDX_COL_STOPS'][line_num][1] + 1,
+                                                   positions['IDX_COL_STOPS'][line_num][1] + 5)
+                    last_station_name = last_station[0]
+                    last_station_time = xlrd.xldate_as_datetime(last_station[3].value, workbook.datemode)
+
                     train.add_stops(
                         Stop(999,
                              last_station_name.value,
@@ -67,7 +80,7 @@ class KorailTimeTableParser(object):
                              )
                     )
 
-                self.trains.append(train)
+                    self.trains.append(train)
 
     def get_trains(self):
         return self.trains
